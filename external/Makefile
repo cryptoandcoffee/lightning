@@ -43,7 +43,7 @@ endif
 EXTERNAL_LDLIBS := -L${TARGET_DIR} $(patsubst lib%.a,-l%,$(notdir $(EXTERNAL_LIBS)))
 
 submodcheck: FORCE
-	@tools/refresh-submodules.sh $(SUBMODULES)
+	echo submodcheck disabled
 
 # We build libsodium, since Ubuntu xenial has one too old.
 $(TARGET_DIR)/libsodium.a: $(TARGET_DIR)/libsodium-build/src/libsodium/libsodium.la
@@ -54,7 +54,7 @@ external/libsodium/src/libsodium/include/sodium.h: submodcheck
 $(TARGET_DIR)/libsodium-build/src/libsodium/libsodium.la: external/libsodium/src/libsodium/include/sodium.h
 	cd external/libsodium && ./autogen.sh
 	mkdir -p ${TARGET_DIR}/libsodium-build
-	cd $(TARGET_DIR)/libsodium-build && $(TOP)/libsodium/configure CC="$(CC)" --enable-static=yes $(CROSSCOMPILE_OPTS) --enable-shared=no --prefix=/ --libdir=/ && $(MAKE)
+	cd $(TARGET_DIR)/libsodium-build && $(TOP)/libsodium/configure CC="$(CC)" CFLAGS=-Wno-error --enable-static=yes $(CROSSCOMPILE_OPTS) --enable-shared=no --enable-tests=no --prefix=/ --libdir=/ && $(MAKE)
 
 $(LIBWALLY_HEADERS) $(LIBSECP_HEADERS): submodcheck
 
@@ -92,7 +92,7 @@ external/libbacktrace/backtrace.h: submodcheck
 # Need separate build dir: changes inside submodule make git think it's dirty.
 $(TARGET_DIR)/libbacktrace.a: external/libbacktrace/backtrace.h
 	@mkdir $(TARGET_DIR)/libbacktrace-build 2>/dev/null || true
-	cd $(TARGET_DIR)/libbacktrace-build && $(TOP)/libbacktrace/configure CC="$(CC)" --enable-static=yes $(CROSSCOMPILE_OPTS) --enable-shared=no --prefix=/ --libdir=/ && $(MAKE)
+	cd $(TARGET_DIR)/libbacktrace-build && $(TOP)/libbacktrace/configure CC="$(CC)" CFLAGS=-Wno-error --enable-static=yes $(CROSSCOMPILE_OPTS) --enable-shared=no --prefix=/ --libdir=/ && $(MAKE)
 	$(MAKE) -C $(TARGET_DIR)/libbacktrace-build DESTDIR=$$(pwd)/$(TARGET_DIR) install-exec
 
 distclean: external-distclean
