@@ -1,5 +1,5 @@
 from concurrent import futures
-from utils import NodeFactory, BitcoinD
+from utils import NodeFactory, BitcoinD, ElementsD
 
 import logging
 import os
@@ -73,9 +73,17 @@ def test_name(request):
     yield request.function.__name__
 
 
+network_daemons = {
+    'regtest': BitcoinD,
+    'liquid-regtest': ElementsD,
+}
+
+
 @pytest.fixture
 def bitcoind(directory, teardown_checks):
-    bitcoind = BitcoinD(bitcoin_dir=directory)
+    chaind = network_daemons[config.get('TEST_NETWORK', 'regtest')]
+    bitcoind = chaind(bitcoin_dir=directory)
+
     try:
         bitcoind.start()
     except Exception:
