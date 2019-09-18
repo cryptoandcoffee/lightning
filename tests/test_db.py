@@ -117,6 +117,7 @@ def test_max_channel_id(node_factory, bitcoind):
 
 
 @unittest.skipIf(not COMPAT, "needs COMPAT to convert obsolete db")
+@unittest.skipIf(TEST_NETWORK != 'regtest', "The network must match the DB snapshot")
 def test_scid_upgrade(node_factory):
 
     # Created through the power of sed "s/X'\([0-9]*\)78\([0-9]*\)78\([0-9]*\)'/X'\13A\23A\3'/"
