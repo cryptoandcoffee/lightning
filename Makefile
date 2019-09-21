@@ -435,7 +435,7 @@ update-mocks/%: %
 	@MAKE=$(MAKE) tools/update-mocks.sh "$*"
 
 unittest/%: %
-	$(VG) $(VG_TEST_ARGS) $* > /dev/null
+	$(VG) $(VG_TEST_ARGS) $*
 
 # Installation directories
 exec_prefix = $(PREFIX)
