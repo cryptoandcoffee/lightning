@@ -606,8 +606,7 @@ int main(void)
 			expect_success = pull_type(valid_streams[i].hex)
 				< pull_type(valid_streams[j].hex);
 
-			assert(fromwire_n1(&p, &max, tlv_n1) &&
-			       n1_is_valid(tlv_n1, NULL) == expect_success);
+			assert(fromwire_n1(&p, &max, tlv_n1) == expect_success);
 
 			if (!expect_success)
 				continue;
