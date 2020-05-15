@@ -1,0 +1,79 @@
+git:
+    depth: 5
+branches:
+    only:
+      - master
+language: c
+sudo: required
+os:
+  - linux
+  - osx
+  - windows
+dist: bionic
+compiler:
+  - clang
+  - gcc
+addons:
+    apt:
+        sources:
+          - ubuntu-toolchain-r-test
+          - llvm-toolchain-bionic-8
+        packages:
+          - llvm-8-dev
+          - python
+          - python-dev
+          - python3
+          - python3-dev
+          - swig
+          - gcc-multilib
+          - clang-8
+matrix:
+    include:
+      - os: linux
+        compiler: clang
+        env: CC=clang-8 CXX=clang++-8 ENABLE_BUILTIN_MEMSET=--disable-builtin-memset
+      - os: linux
+        compiler: clang
+        env: CC=clang-8 CXX=clang++-8 HOST=i686-linux-gnu ENABLE_BUILTIN_MEMSET=--disable-builtin-memset
+      - os: linux
+        compiler: gcc
+        env: HOST=i686-linux-gnu
+      - compiler: gcc
+        os: linux
+        env: PYTHON_VERSION=3
+      - compiler: clang
+        os: linux
+        env: DEBUG_WALLY=--enable-debug
+      - compiler: clang
+        os: linux
+        env: CC=clang-8 CXX=clang++-8 ENABLE_ELEMENTS=--enable-elements ENABLE_BUILTIN_MEMSET=--disable-builtin-memset
+      - os: windows
+        env: PATH=/c/Python37:/c/Python37/Scripts:$PATH SWIG_PATH=/c/swig NODE_VERSION=node/10.16.3
+        before_script:
+        script:
+          - tools/msvc/wheel.bat
+      - os: windows
+        env: PATH=/c/Python37:/c/Python37/Scripts:$PATH NODE_VERSION=node/10.16.3
+        before_script:
+        script:
+          - source $ProgramData/nvs/nvs.sh
+          - nvs use $NODE_VERSION
+          - tools/msvc/wallyjs.bat
+    exclude:
+      - os: windows
+        compiler: gcc
+      - os: windows
+        compiler: clang
+      - os: linux
+        compiler: clang
+
+
+before_script:
+  - ./tools/cleanup.sh && ./tools/autogen.sh
+before_install:
+  - ./tools/travis_install.sh
+script:
+  - ./tools/travis_build.sh
+  - if [[ "$CC" == "clang" ]]; then ./tools/build_js_bindings.sh; fi
+notifications:
+    email: false
