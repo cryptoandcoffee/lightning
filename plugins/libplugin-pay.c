@@ -1498,3 +1498,37 @@ static struct routehints_data *routehint_data_init(struct payment *p)
 
 REGISTER_PAYMENT_MODIFIER(routehints, struct routehints_data *,
 			  routehint_data_init, routehint_step_cb);
+
+/* For tiny payments the fees incurred due to the fixed base_fee may dominate
+ * the overall cost of the payment. Since these payments are often used as a
+ * way to signal, rather than actually transfer the amount, we add an
+ * exemption that allows tiny payments to exceed the fee allowance. This is
+ * implemented by setting a larger allowance than we would normally do if the
+ * payment is below the threshold. */
+
+static struct exemptfee_data *exemptfee_data_init(struct payment *p)
+{
+	struct exemptfee_data *d = tal(p, struct exemptfee_data);
+	d->amount = AMOUNT_MSAT(5000);
+	return d;
+}
+
+static void exemptfee_cb(struct exemptfee_data *d, struct payment *p)
+{
+	if (p->step != PAYMENT_STEP_INITIALIZED)
+		return payment_continue(p);
+
+	if (amount_msat_greater_eq(d->amount, p->amount)) {
+		p->fee_budget = d->amount;
+		plugin_log(
+		    p->plugin, LOG_INFORM,
+		    "Payment amount is below exemption threshold, "
+		    "allowing a maximum fee of %s",
+		    type_to_string(tmpctx, struct amount_msat, &p->fee_budget));
+	}
+	return payment_continue(p);
+}
+
+REGISTER_PAYMENT_MODIFIER(exemptfee, struct exemptfee_data *,
+			  exemptfee_data_init, exemptfee_cb);
+

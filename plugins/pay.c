@@ -1834,7 +1834,8 @@ static void init(struct plugin *p,
 	maxdelay_default = atoi(field);
 }
 
-struct payment_modifier *paymod_mods[4] = {
+struct payment_modifier *paymod_mods[5] = {
+	&exemptfee_pay_mod,
 	&routehints_pay_mod,
 	&local_channel_hints_pay_mod,
 	&retry_pay_mod,
@@ -1854,6 +1855,7 @@ static struct command_result *json_paymod(struct command *cmd,
 	char *fail;
 	u64 *maxfee_pct_millionths;
 	u32 *maxdelay;
+	struct amount_msat *exemptfee;
 
 	p = payment_new(NULL, cmd, NULL /* No parent */, paymod_mods);
 
@@ -1861,6 +1863,7 @@ static struct command_result *json_paymod(struct command *cmd,
 	 * would add them to the `param()` call below, and have them be
 	 * initialized directly that way. */
 	if (!param(cmd, buf, params, p_req("bolt11", param_string, &b11str),
+		   p_opt_def("exemptfee", param_msat, &exemptfee, AMOUNT_MSAT(5000)),
 		   p_opt_def("maxdelay", param_number, &maxdelay,
 			     maxdelay_default),
 		   p_opt_def("maxfeepercent", param_millionths,
@@ -1914,6 +1917,9 @@ static struct command_result *json_paymod(struct command *cmd,
 		    cmd, JSONRPC2_INVALID_PARAMS,
 		    "Overflow when computing fee budget, fee rate too high.");
 	}
+
+	payment_mod_exemptfee_get_data(p)->amount = *exemptfee;
+
 	payment_start(p);
 	list_add_tail(&payments, &p->list);
 
