@@ -1586,6 +1586,9 @@ static struct command_result *json_paystatus(struct command *cmd,
 			continue;
 
 		json_object_start(ret, NULL);
+		if (p->label != NULL)
+			json_add_string(ret, "label", p->label);
+
 		if (p->bolt11)
 			json_add_string(ret, "bolt11", p->bolt11);
 		json_add_u64(ret, "msatoshi",
@@ -1834,7 +1837,8 @@ static void init(struct plugin *p,
 	maxdelay_default = atoi(field);
 }
 
-struct payment_modifier *paymod_mods[5] = {
+struct payment_modifier *paymod_mods[6] = {
+	&shadowroute_pay_mod,
 	&exemptfee_pay_mod,
 	&routehints_pay_mod,
 	&local_channel_hints_pay_mod,
@@ -1856,6 +1860,10 @@ static struct command_result *json_paymod(struct command *cmd,
 	u64 *maxfee_pct_millionths;
 	u32 *maxdelay;
 	struct amount_msat *exemptfee;
+	const char *label;
+#if DEVELOPER
+	bool *use_shadow;
+#endif
 
 	p = payment_new(NULL, cmd, NULL /* No parent */, paymod_mods);
 
@@ -1863,11 +1871,15 @@ static struct command_result *json_paymod(struct command *cmd,
 	 * would add them to the `param()` call below, and have them be
 	 * initialized directly that way. */
 	if (!param(cmd, buf, params, p_req("bolt11", param_string, &b11str),
+		   p_opt("label", param_string, &label),
 		   p_opt_def("exemptfee", param_msat, &exemptfee, AMOUNT_MSAT(5000)),
 		   p_opt_def("maxdelay", param_number, &maxdelay,
 			     maxdelay_default),
 		   p_opt_def("maxfeepercent", param_millionths,
 			     &maxfee_pct_millionths, 500000),
+#if DEVELOPER
+		   p_opt_def("use_shadow", param_bool, &use_shadow, true),
+#endif
 		      NULL))
 		return command_param_failed();
 
@@ -1921,7 +1933,10 @@ static struct command_result *json_paymod(struct command *cmd,
 	p->constraints.cltv_budget = *maxdelay;
 
 	payment_mod_exemptfee_get_data(p)->amount = *exemptfee;
-
+#if DEVELOPER
+	payment_mod_shadowroute_get_data(p)->use_shadow = *use_shadow;
+#endif
+	p->label = tal_steal(p, label);
 	payment_start(p);
 	list_add_tail(&payments, &p->list);
 
