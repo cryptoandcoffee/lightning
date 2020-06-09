@@ -1362,7 +1362,7 @@ def test_reserve_enforcement(node_factory, executor):
 
 
 @unittest.skipIf(not DEVELOPER, "needs dev_disconnect")
-def test_htlc_send_timeout(node_factory, bitcoind):
+def test_htlc_send_timeout(node_factory, bitcoind, compat):
     """Test that we don't commit an HTLC to an unreachable node."""
     # Feerates identical so we don't get gratuitous commit to update them
     l1 = node_factory.get_node(options={'log-level': 'io'},
@@ -1398,7 +1398,7 @@ def test_htlc_send_timeout(node_factory, bitcoind):
     err = excinfo.value
     # Complains it stopped after several attempts.
     # FIXME: include in pylightning
-    PAY_STOPPED_RETRYING = 210
+    PAY_STOPPED_RETRYING = 210 if compat('090') else 205
     assert err.error['code'] == PAY_STOPPED_RETRYING
 
     status = only_one(l1.rpc.call('paystatus')['pay'])
