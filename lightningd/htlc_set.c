@@ -181,7 +181,7 @@ void htlc_set_add(struct lightningd *ld,
 		return;
 	}
 
-	if (amount_msat_eq(set->so_far, total_msat)) {
+	if (amount_msat_greater_eq(set->so_far, total_msat)) {
 		/* Disable timer now, in case invoice_hook is slow! */
 		tal_free(set->timeout);
 		invoice_try_pay(ld, set, details);
