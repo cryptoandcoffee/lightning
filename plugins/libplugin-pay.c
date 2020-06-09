@@ -1790,3 +1790,111 @@ static void shadow_route_cb(struct shadow_route_data *d,
 
 REGISTER_PAYMENT_MODIFIER(shadowroute, struct shadow_route_data *,
 			  shadow_route_init, shadow_route_cb);
+
+static void direct_pay_override(struct payment *p) {
+
+	/* The root has performed the search for a direct channel. */
+	struct payment *root = payment_root(p);
+	struct direct_pay_data *d;
+	struct channel_hint *hint = NULL;
+
+	/* If we were unable to find a direct channel we don't need to do
+	 * anything. */
+	d = payment_mod_directpay_get_data(root);
+
+	if (d->chan == NULL)
+		return payment_continue(p);
+
+	/* If we have a channel we need to make sure that it still has
+	 * sufficient capacity. Look it up in the channel_hints. */
+	for (size_t i=0; i<tal_count(root->channel_hints); i++) {
+		struct short_channel_id_dir *cur = &root->channel_hints[i].scid;
+		if (short_channel_id_eq(&cur->scid, &d->chan->scid) &&
+		    cur->dir == d->chan->dir) {
+			hint = &root->channel_hints[i];
+			break;
+		}
+	}
+
+	if (hint && hint->enabled &&
+	    amount_msat_greater(hint->estimated_capacity, p->amount)) {
+		/* Now build a route that consists only of this single hop */
+		p->route = tal_arr(p, struct route_hop, 1);
+		p->route[0].amount = p->amount;
+		p->route[0].delay = p->getroute->cltv;
+		p->route[0].channel_id = hint->scid.scid;
+		p->route[0].direction = hint->scid.dir;
+		p->route[0].nodeid = *p->destination;
+		p->route[0].style = ROUTE_HOP_TLV;
+		plugin_log(p->plugin, LOG_DBG,
+			   "Found a direct channel (%s) with sufficient "
+			   "capacity, skipping route computation.",
+			   type_to_string(tmpctx, struct short_channel_id_dir,
+					  &hint->scid));
+
+		payment_set_step(p, PAYMENT_STEP_GOT_ROUTE);
+	}
+
+
+	payment_continue(p);
+}
+
+/* Now that we have the listpeers result for the root payment, let's search
+ * for a direct channel that is a) connected and b) in state normal. We will
+ * check the capacity based on the channel_hints in the override. */
+static struct command_result *direct_pay_listpeers(struct command *cmd,
+						   const char *buffer,
+						   const jsmntok_t *toks,
+						   struct payment *p)
+{
+	struct listpeers_result *r =
+	    json_to_listpeers_result(tmpctx, buffer, toks);
+	struct direct_pay_data *d = payment_mod_directpay_get_data(p);
+
+	if (tal_count(r->peers) == 1) {
+		struct listpeers_peer *peer = r->peers[0];
+		if (!peer->connected)
+			goto cont;
+
+		for (size_t i=0; i<tal_count(peer->channels); i++) {
+			struct listpeers_channel *chan = r->peers[0]->channels[i];
+			if (!streq(chan->state, "CHANNELD_NORMAL"))
+			    continue;
+
+			d->chan = tal(d, struct short_channel_id_dir);
+			d->chan->scid = *chan->scid;
+			d->chan->dir = *chan->direction;
+		}
+	}
+cont:
+	direct_pay_override(p);
+	return command_still_pending(cmd);
+
+}
+
+static void direct_pay_cb(struct direct_pay_data *d, struct payment *p)
+{
+	struct out_req *req;
+
+/* Look up the direct channel only on root. */
+	if (p->step != PAYMENT_STEP_INITIALIZED)
+		return payment_continue(p);
+
+
+
+	req = jsonrpc_request_start(p->plugin, NULL, "listpeers",
+				    direct_pay_listpeers, direct_pay_listpeers,
+				    p);
+	json_add_node_id(req->js, "id", p->destination);
+	send_outreq(p->plugin, req);
+}
+
+static struct direct_pay_data *direct_pay_init(struct payment *p)
+{
+	struct direct_pay_data *d = tal(p, struct direct_pay_data);
+	d->chan = NULL;
+	return d;
+}
+
+REGISTER_PAYMENT_MODIFIER(directpay, struct direct_pay_data *, direct_pay_init,
+			  direct_pay_cb);

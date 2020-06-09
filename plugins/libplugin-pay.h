@@ -306,11 +306,18 @@ struct shadow_route_data {
 	struct node_id destination;
 	struct route_hop *route;
 };
+
+struct direct_pay_data {
+	/* If we have a direct channel remember it, so we can check each
+	 * attempt against the channel hints. */
+	struct short_channel_id_dir *chan;
+};
 /* List of globally available payment modifiers. */
 REGISTER_PAYMENT_MODIFIER_HEADER(retry, struct retry_mod_data);
 REGISTER_PAYMENT_MODIFIER_HEADER(routehints, struct routehints_data);
 REGISTER_PAYMENT_MODIFIER_HEADER(exemptfee, struct exemptfee_data);
 REGISTER_PAYMENT_MODIFIER_HEADER(shadowroute, struct shadow_route_data);
+REGISTER_PAYMENT_MODIFIER_HEADER(directpay, struct direct_pay_data);
 
 /* For the root payment we can seed the channel_hints with the result from
  * `listpeers`, hence avoid channels that we know have insufficient capacity
