@@ -1039,6 +1039,42 @@ static struct command_result *payment_child_finished(struct payment *p,
 	return payment_finished(p);
 }
 
+static void payment_add_attempt(struct json_stream *s, const char *fieldname, struct payment *p, bool recurse)
+{
+	bool finished = p->step >= PAYMENT_STEP_RETRY,
+	     success = p->step == PAYMENT_STEP_SUCCESS;
+
+	/* A fieldname is only reasonable if we're not recursing. Otherwise the
+	 * fieldname would be reused for all attempts. */
+	assert(!recurse || fieldname == NULL);
+
+	json_object_start(s, fieldname);
+
+	if (!finished)
+		json_add_string(s, "status", "pending");
+	else if (success)
+		json_add_string(s, "status", "success");
+	else
+		json_add_string(s, "status", "failed");
+
+	if (p->failreason != NULL)
+		json_add_string(s, "failreason", p->failreason);
+
+	json_object_end(s);
+	for (size_t i=0; i<tal_count(p->children); i++) {
+		payment_add_attempt(s, fieldname, p->children[i], recurse);
+	}
+}
+
+static void payment_json_add_attempts(struct json_stream *s,
+				      const char *fieldname, struct payment *p)
+{
+	assert(p == payment_root(p));
+	json_array_start(s, fieldname);
+	payment_add_attempt(s, NULL, p, true);
+	json_array_end(s);
+}
+
 /* This function is called whenever a payment ends up in a final state, or all
  * leafs in the subtree rooted in the payment are all in a final state. It is
  * called only once, and it is guaranteed to be called in post-order
@@ -1066,7 +1102,9 @@ static struct command_result *payment_finished(struct payment *p)
 			assert(result.preimage != NULL);
 
 			ret = jsonrpc_stream_success(p->cmd);
+			json_add_node_id(ret, "destination", p->destination);
 			json_add_sha256(ret, "payment_hash", p->payment_hash);
+			json_add_timeabs(ret, "created_at", p->start_time);
 			json_add_num(ret, "parts", result.attempts);
 
 			json_add_amount_msat_compat(ret, p->amount, "msatoshi",
@@ -1100,7 +1138,7 @@ static struct command_result *payment_finished(struct payment *p)
 				    "%d attempt%s: see paystatus",
 				    result.attempts,
 				    result.attempts == 1 ? "" : "s"));
-			json_add_num(ret, "attempts", result.attempts);
+			payment_json_add_attempts(ret, "attempts", p);
 			return command_finished(cmd, ret);
 
 		}  else {
@@ -1168,6 +1206,7 @@ static struct command_result *payment_finished(struct payment *p)
 					    *failure->erring_direction);
 			}
 			json_object_end(ret);
+			payment_json_add_attempts(ret, "attempts", p);
 
 			return command_finished(cmd, ret);
 		}
