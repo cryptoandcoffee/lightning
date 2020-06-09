@@ -3,23 +3,9 @@
 #include "config.h"
 
 #include <common/bolt11.h>
+#include <common/rpcclient.h>
 #include <plugins/libplugin.h>
 #include <wire/gen_onion_wire.h>
-
-enum route_hop_style {
-	ROUTE_HOP_LEGACY = 1,
-	ROUTE_HOP_TLV = 2,
-};
-
-struct route_hop {
-	struct short_channel_id channel_id;
-	int direction;
-	struct node_id nodeid;
-	struct amount_msat amount;
-	u32 delay;
-	struct pubkey *blinding;
-	enum route_hop_style style;
-};
 
 struct legacy_payload {
 	struct short_channel_id scid;
@@ -40,11 +26,6 @@ struct createonion_request {
 	struct createonion_hop *hops;
 	u8 *assocdata;
 	struct secret *session_key;
-};
-
-struct createonion_response {
-	u8 *onion;
-	struct secret *shared_secrets;
 };
 
 /* States returned by listsendpays, waitsendpay, etc. */

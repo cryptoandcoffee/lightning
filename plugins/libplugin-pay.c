@@ -7,6 +7,7 @@
 #include <ccan/tal/str/str.h>
 #include <common/json_stream.h>
 #include <common/pseudorand.h>
+#include <common/rpcclient.h>
 
 #define DEFAULT_FINAL_CLTV_DELTA 9
 
@@ -183,48 +184,6 @@ void payment_start(struct payment *p)
 					  payment_rpc_failure, p));
 }
 
-static bool route_hop_from_json(struct route_hop *dst, const char *buffer,
-				const jsmntok_t *toks)
-{
-	const jsmntok_t *idtok = json_get_member(buffer, toks, "id");
-	const jsmntok_t *channeltok = json_get_member(buffer, toks, "channel");
-	const jsmntok_t *directiontok = json_get_member(buffer, toks, "direction");
-	const jsmntok_t *amounttok = json_get_member(buffer, toks, "amount_msat");
-	const jsmntok_t *delaytok = json_get_member(buffer, toks, "delay");
-	const jsmntok_t *styletok = json_get_member(buffer, toks, "style");
-
-	if (idtok == NULL || channeltok == NULL || directiontok == NULL ||
-	    amounttok == NULL || delaytok == NULL || styletok == NULL)
-		return false;
-
-	json_to_node_id(buffer, idtok, &dst->nodeid);
-	json_to_short_channel_id(buffer, channeltok, &dst->channel_id);
-	json_to_int(buffer, directiontok, &dst->direction);
-	json_to_msat(buffer, amounttok, &dst->amount);
-	json_to_number(buffer, delaytok, &dst->delay);
-	dst->style = json_tok_streq(buffer, styletok, "legacy")
-			 ? ROUTE_HOP_LEGACY
-			 : ROUTE_HOP_TLV;
-	return true;
-}
-
-static struct route_hop *
-tal_route_from_json(const tal_t *ctx, const char *buffer, const jsmntok_t *toks)
-{
-	size_t num = toks->size, i;
-	struct route_hop *hops;
-	const jsmntok_t *rtok;
-	if (toks->type != JSMN_ARRAY)
-		return NULL;
-
-	hops = tal_arr(ctx, struct route_hop, num);
-	json_for_each_arr(i, rtok, toks) {
-		if (!route_hop_from_json(&hops[i], buffer, rtok))
-			return tal_free(hops);
-	}
-	return hops;
-}
-
 static void payment_exclude_most_expensive(struct payment *p)
 {
 	struct payment *root = payment_root(p);
@@ -367,7 +326,7 @@ static struct command_result *payment_getroute_result(struct command *cmd,
 	struct amount_msat fee;
 	const char *reason;
 	assert(rtok != NULL);
-	p->route = tal_route_from_json(p, buffer, rtok);
+	p->route = json_to_route(p, buffer, rtok);
 	p->step = PAYMENT_STEP_GOT_ROUTE;
 
 	fee = payment_route_fee(p);
@@ -511,37 +470,6 @@ static u8 *tal_towire_legacy_payload(const tal_t *ctx, const struct legacy_paylo
 	towire(&buf, padding, ARRAY_SIZE(padding));
 	assert(tal_bytelen(buf) == 1 + 32);
 	return buf;
-}
-
-static struct createonion_response *
-tal_createonion_response_from_json(const tal_t *ctx, const char *buffer,
-				   const jsmntok_t *toks)
-{
-	size_t i;
-	struct createonion_response *resp;
-	const jsmntok_t *oniontok = json_get_member(buffer, toks, "onion");
-	const jsmntok_t *secretstok = json_get_member(buffer, toks, "shared_secrets");
-	const jsmntok_t *cursectok;
-
-	if (oniontok == NULL || secretstok == NULL)
-		return NULL;
-	resp = tal(ctx, struct createonion_response);
-
-	if (oniontok->type != JSMN_STRING)
-		goto fail;
-
-	resp->onion = json_tok_bin_from_hex(resp, buffer, oniontok);
-	resp->shared_secrets = tal_arr(resp, struct secret, secretstok->size);
-
-	json_for_each_arr(i, cursectok, secretstok) {
-		if (cursectok->type != JSMN_STRING)
-			goto fail;
-		json_to_secret(buffer, cursectok, &resp->shared_secrets[i]);
-	}
-	return resp;
-
-fail:
-	return tal_free(resp);
 }
 
 static struct payment_result *tal_sendpay_result_from_json(const tal_t *ctx,
@@ -824,7 +752,7 @@ static struct command_result *payment_createonion_success(struct command *cmd,
 
 	payment_chanhints_apply_route(p, false);
 
-	p->createonion_response = tal_createonion_response_from_json(p, buffer, toks);
+	p->createonion_response = json_to_createonion_response(p, buffer, toks);
 
 	req = jsonrpc_request_start(p->plugin, NULL, "sendonion",
 				    payment_sendonion_success,

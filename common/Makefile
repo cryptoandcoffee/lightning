@@ -57,6 +57,7 @@ COMMON_SRC_NOGEN :=				\
 	common/ping.c				\
 	common/pseudorand.c			\
 	common/read_peer_msg.c			\
+	common/rpcclient.c			\
 	common/setup.c				\
 	common/socket_close.c			\
 	common/sphinx.c				\
