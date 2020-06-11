@@ -39,6 +39,7 @@ struct payment *payment_new(tal_t *ctx, struct command *cmd,
 
 		/* Re-establish the unmodified constraints for our sub-payment. */
 		p->constraints = *parent->start_constraints;
+		p->deadline = parent->deadline;
 	} else {
 		assert(cmd != NULL);
 		p->partid = 0;
@@ -1294,9 +1295,20 @@ static inline void retry_step_cb(struct retry_mod_data *rd,
 {
 	struct payment *subpayment;
 	struct retry_mod_data *rdata = payment_mod_retry_get_data(p);
+	struct timeabs now = time_now();
 
 	if (p->step != PAYMENT_STEP_FAILED)
 		return payment_continue(p);
+
+	if (time_after(now, p->deadline)) {
+		plugin_log(
+		    p->plugin, LOG_INFORM,
+		    "Payment deadline expired, not retrying (partial-)payment "
+		    "%s/%d",
+		    type_to_string(tmpctx, struct sha256, p->payment_hash),
+		    p->partid);
+		return payment_continue(p);
+	}
 
 	/* If we failed to find a route, it's unlikely we can suddenly find a
 	 * new one without any other changes, so it's time to give up. */
