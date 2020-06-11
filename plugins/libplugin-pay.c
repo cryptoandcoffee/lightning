@@ -1910,3 +1910,94 @@ static struct direct_pay_data *direct_pay_init(struct payment *p)
 
 REGISTER_PAYMENT_MODIFIER(directpay, struct direct_pay_data *, direct_pay_init,
 			  direct_pay_cb);
+
+static struct command_result *waitblockheight_rpc_cb(struct command *cmd,
+						     const char *buffer,
+						     const jsmntok_t *toks,
+						     struct payment *p)
+{
+	struct payment *subpayment;
+	subpayment = payment_new(p, NULL, p, p->modifiers);
+	payment_start(subpayment);
+	payment_set_step(p, PAYMENT_STEP_RETRY);
+	subpayment->why =
+		tal_fmt(subpayment, "Retrying after waiting for blockchain sync.");
+	payment_continue(p);
+	return command_still_pending(cmd);
+}
+
+/* Estimate the remote node's blockheight based on an error they
+ * returned. Returns 0 if we were unable to determine the remote
+ * blockheight. */
+static u32 get_remote_block_height(const u8 *raw_message)
+{
+	int type;
+	size_t raw_message_len = tal_count(raw_message);
+	/* BOLT #4:
+	 *
+	 * 1. type: PERM|15 (`incorrect_or_unknown_payment_details`)
+	 * 2. data:
+   	 * * [`u64`:`htlc_msat`]
+   	 * * [`u32`:`height`]
+	 *
+	 */
+	type = fromwire_u16(&raw_message, &raw_message_len); /* type */
+	if (type != WIRE_INCORRECT_OR_UNKNOWN_PAYMENT_DETAILS)
+		return 0;
+
+	(void) fromwire_u64(&raw_message, &raw_message_len); /* htlc_msat */
+
+	return fromwire_u32(&raw_message, &raw_message_len); /* height */
+}
+
+static void waitblockheight_cb(void *d, struct payment *p)
+{
+	struct out_req *req;
+	struct timeabs now = time_now();
+	struct timerel remaining;
+	u32 blockheight;
+	int failcode;
+	const u8 *raw_message;
+	if (p->step != PAYMENT_STEP_FAILED)
+		return payment_continue(p);
+
+	/* If we don't have an error message to parse we can't wait for blockheight. */
+	if (p->result == NULL)
+		return payment_continue(p);
+
+	if (time_after(now, p->deadline))
+		return payment_continue(p);
+
+	failcode = p->result->failcode;
+	raw_message = p->result->raw_message;
+	remaining = time_between(p->deadline, now);
+
+	if (failcode != 17 /* Former final_expiry_too_soon */ &&
+	    failcode != WIRE_INCORRECT_OR_UNKNOWN_PAYMENT_DETAILS)
+		return payment_continue(p);
+
+	if (failcode == 17)
+		blockheight = p->start_block + 1;
+	else
+		blockheight = get_remote_block_height(raw_message);
+
+	/* If we were unable to parse the target blockheight just continue. */
+	if (blockheight == 0)
+		return payment_continue(p);
+
+	plugin_log(p->plugin, LOG_INFORM,
+		   "Remote node appears to be on a longer chain, which causes "
+		   "CLTV timeouts to be incorrect. Waiting up to %" PRIu64
+		   " seconds to catch up to block %d before retrying.",
+		   time_to_sec(remaining), blockheight);
+
+	assert(blockheight >= p->start_block);
+	req = jsonrpc_request_start(p->plugin, NULL, "waitblockheight",
+				    waitblockheight_rpc_cb,
+				    waitblockheight_rpc_cb, p);
+	json_add_u32(req->js, "blockheight", blockheight);
+	json_add_u32(req->js, "timeout", time_to_sec(remaining));
+	send_outreq(p->plugin, req);
+}
+
+REGISTER_PAYMENT_MODIFIER(waitblockheight, void *, NULL, waitblockheight_cb);
