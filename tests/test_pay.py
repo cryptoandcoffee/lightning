@@ -3454,6 +3454,7 @@ def test_mpp_interference_2(node_factory, bitcoind, executor):
 
     # Now wait for the buyers to learn the entire public network.
     bitcoind.generate_block(5)
+    sync_blockheight(bitcoind, [l1, l2, l3, l4, l5, l6, l7])
     for channel in public_network:
         wait_for(lambda: len(l2.rpc.listchannels(channel)['channels']) >= 2)
         wait_for(lambda: len(l3.rpc.listchannels(channel)['channels']) >= 2)
