@@ -3378,7 +3378,6 @@ def test_mpp_waitblockheight_routehint_conflict(node_factory, bitcoind, executor
 
 @unittest.skipIf(not DEVELOPER, "channel setup very slow (~10 minutes) if not DEVELOPER")
 @pytest.mark.slow_test
-@unittest.skipIf(True, "Broken")
 def test_mpp_interference_2(node_factory, bitcoind, executor):
     '''
     We create a "public network" that looks like so.
