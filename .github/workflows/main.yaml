@@ -25,5 +25,5 @@ jobs:
       run: |
         bash -x .github/workflows/build.sh
       env:
-        - VALGRIND: ${{matrix.valgrind}}
-        - DEVELOPER: ${{matrix.developer}}
+        VALGRIND: ${{matrix.valgrind}}
+        DEVELOPER: ${{matrix.developer}}
