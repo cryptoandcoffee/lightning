@@ -16,7 +16,7 @@ export TEST_NETWORK=${NETWORK:-"regtest"}
 
 # Allow up to 4 concurrent tests when not under valgrind, which might run out of memory.
 if [ "$VALGRIND" = 0 ]; then
-    PYTEST_PAR=4
+    PYTEST_PAR=10
 fi
 export TEST_CMD=${TEST_CMD:-"make -j $PYTEST_PAR pytest"}
 
