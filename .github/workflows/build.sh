@@ -50,7 +50,8 @@ if [ "$NO_PYTHON" != 1 ]; then
 
     pip3 install --user -U --quiet --progress-bar off \
 	 pytest-sentry \
-	 pytest-rerunfailures
+	 pytest-rerunfailures \
+	 blinker
 
    cat > pytest.ini << EOF
 [pytest]
