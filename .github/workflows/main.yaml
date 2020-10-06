@@ -8,7 +8,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.6, 3.8]
+        python-version: [3.6]
+        valgrind: [0, 1]
 
     steps:
     - uses: actions/checkout@v2
