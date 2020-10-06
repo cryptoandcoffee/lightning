@@ -24,3 +24,6 @@ jobs:
     - name: Build and Test
       run: |
         bash -x .github/workflows/build.sh
+      env:
+        - VALGRIND: ${{matrix.valgrind}}
+        - DEVELOPER: ${{matrix.developer}}
