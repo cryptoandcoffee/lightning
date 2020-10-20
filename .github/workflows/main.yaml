@@ -1,4 +1,4 @@
-name: Python package
+name: Compile & Test
 
 on: [push]
 
@@ -27,3 +27,4 @@ jobs:
       env:
         VALGRIND: ${{matrix.valgrind}}
         DEVELOPER: ${{matrix.developer}}
+        TIMEOUT: 300
