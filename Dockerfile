@@ -24,9 +24,9 @@ ENV BITCOIN_ASC_URL https://bitcoincore.org/bin/bitcoin-core-$BITCOIN_VERSION/SH
 
 RUN mkdir /opt/bitcoin && cd /opt/bitcoin \
     && wget -qO $BITCOIN_TARBALL "$BITCOIN_URL" \
-#    && wget -qO bitcoin.asc "$BITCOIN_ASC_URL" \
-#    && grep $BITCOIN_TARBALL bitcoin.asc | tee SHA256SUMS.asc \
-#    && sha256sum -c SHA256SUMS.asc \
+    && wget -qO bitcoin.asc "$BITCOIN_ASC_URL" \
+    && grep $BITCOIN_TARBALL bitcoin.asc | tee SHA256SUMS.asc \
+    && sha256sum -c SHA256SUMS.asc \
     && BD=bitcoin-$BITCOIN_VERSION/bin \
     && tar -xzvf $BITCOIN_TARBALL $BD/bitcoin-cli --strip-components=1 \
     && rm $BITCOIN_TARBALL
