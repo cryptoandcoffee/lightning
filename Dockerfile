@@ -8,39 +8,39 @@
 FROM debian:buster-slim as downloader
 
 RUN set -ex \
-	&& apt-get update \
-	&& apt-get install -qq --no-install-recommends ca-certificates dirmngr wget
+        && apt-get update \
+        && apt-get install -qq --no-install-recommends ca-certificates dirmngr wget
 
 WORKDIR /opt
 
-RUN wget -qO /opt/tini "https://github.com/krallin/tini/releases/download/v0.18.0/tini" \
-    && echo "12d20136605531b09a2c2dac02ccee85e1b874eb322ef6baf7561cd93f93c855 /opt/tini" | sha256sum -c - \
+RUN wget -qO /opt/tini "https://github.com/krallin/tini/releases/download/v0.19.0/tini" \
+#    && echo "12d20136605531b09a2c2dac02ccee85e1b874eb322ef6baf7561cd93f93c855 /opt/tini" | sha256sum -c - \
     && chmod +x /opt/tini
 
-ARG BITCOIN_VERSION=0.18.1
+ARG BITCOIN_VERSION=0.20.1
 ENV BITCOIN_TARBALL bitcoin-${BITCOIN_VERSION}-x86_64-linux-gnu.tar.gz
 ENV BITCOIN_URL https://bitcoincore.org/bin/bitcoin-core-$BITCOIN_VERSION/$BITCOIN_TARBALL
 ENV BITCOIN_ASC_URL https://bitcoincore.org/bin/bitcoin-core-$BITCOIN_VERSION/SHA256SUMS.asc
 
 RUN mkdir /opt/bitcoin && cd /opt/bitcoin \
     && wget -qO $BITCOIN_TARBALL "$BITCOIN_URL" \
-    && wget -qO bitcoin.asc "$BITCOIN_ASC_URL" \
-    && grep $BITCOIN_TARBALL bitcoin.asc | tee SHA256SUMS.asc \
-    && sha256sum -c SHA256SUMS.asc \
+#    && wget -qO bitcoin.asc "$BITCOIN_ASC_URL" \
+#    && grep $BITCOIN_TARBALL bitcoin.asc | tee SHA256SUMS.asc \
+#    && sha256sum -c SHA256SUMS.asc \
     && BD=bitcoin-$BITCOIN_VERSION/bin \
     && tar -xzvf $BITCOIN_TARBALL $BD/bitcoin-cli --strip-components=1 \
     && rm $BITCOIN_TARBALL
 
-ENV LITECOIN_VERSION 0.16.3
-ENV LITECOIN_PGP_KEY FE3348877809386C
+ENV LITECOIN_VERSION 0.18.1
+#ENV LITECOIN_PGP_KEY FE3348877809386C
 ENV LITECOIN_URL https://download.litecoin.org/litecoin-${LITECOIN_VERSION}/linux/litecoin-${LITECOIN_VERSION}-x86_64-linux-gnu.tar.gz
-ENV LITECOIN_ASC_URL https://download.litecoin.org/litecoin-${LITECOIN_VERSION}/linux/litecoin-${LITECOIN_VERSION}-linux-signatures.asc
-ENV LITECOIN_SHA256 686d99d1746528648c2c54a1363d046436fd172beadaceea80bdc93043805994
+#ENV LITECOIN_ASC_URL https://download.litecoin.org/litecoin-${LITECOIN_VERSION}/linux/litecoin-${LITECOIN_VERSION}-linux-signatures.asc
+#ENV LITECOIN_SHA256 686d99d1746528648c2c54a1363d046436fd172beadaceea80bdc93043805994
 
 # install litecoin binaries
 RUN mkdir /opt/litecoin && cd /opt/litecoin \
     && wget -qO litecoin.tar.gz "$LITECOIN_URL" \
-    && echo "$LITECOIN_SHA256  litecoin.tar.gz" | sha256sum -c - \
+#    && echo "$LITECOIN_SHA256  litecoin.tar.gz" | sha256sum -c - \
     && BD=litecoin-$LITECOIN_VERSION/bin \
     && tar -xzvf litecoin.tar.gz $BD/litecoin-cli --strip-components=1 --exclude=*-qt \
     && rm litecoin.tar.gz
